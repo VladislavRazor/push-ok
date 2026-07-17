@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Англо‑русский тренажёр (API)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f0f4f8;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .app {
+            background: white;
+            max-width: 520px;
+            width: 100%;
+            border-radius: 32px;
+            padding: 30px 25px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            text-align: center;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+        .sub {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .word-display {
+            font-size: 42px;
+            font-weight: 700;
+            color: #0f172a;
+            padding: 20px 0;
+            background: #f8fafc;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: break-word;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .input-area input {
+            flex: 1;
+            padding: 14px 18px;
+            font-size: 18px;
+            border: 2px solid #e2e8f0;
+            border-radius: 14px;
+            outline: none;
+            transition: 0.2s;
+        }
+        .input-area input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        .input-area input:disabled {
+            background: #f1f5f9;
+            opacity: 0.7;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin: 10px 0 16px;
+        }
+        .btn {
+            padding: 12px 28px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.15s;
+            flex: 1;
+        }
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .btn-secondary:hover {
+            background: #cbd5e1;
+        }
+        .btn-secondary:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .result {
+            min-height: 30px;
+            font-size: 18px;
+            font-weight: 500;
+            margin: 12px 0 8px;
+        }
+        .stats {
+            color: #475569;
+            font-size: 15px;
+            margin-top: 10px;
+        }
+        .progress {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 3px;
+            margin-top: 16px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #3b82f6;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .footer {
+            margin-top: 18px;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        .footer a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+        .loader {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #e2e8f0;
+            border-radius: 50%;
+            border-top-color: #3b82f6;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <h1>📘 Словотренажёр</h1>
+        <div class="sub">Английский → Русский (перевод через API)</div>
+
+        <div class="word-display" id="wordDisplay">Загрузка слов…</div>
+
+        <div class="input-area">
+            <input type="text" id="answerInput" placeholder="Введите перевод..." autofocus disabled />
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-primary" id="checkBtn" disabled>✅ Проверить</button>
+            <button class="btn btn-secondary" id="skipBtn" disabled>⏭ Пропустить</button>
+        </div>
+
+        <div class="result" id="resultMessage"></div>
+        <div class="stats" id="statsText">Загрузка словаря…</div>
+        <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+        <div class="footer" id="apiStatus">⚡ Используется MyMemory API</div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // --- DOM-элементы ---
+            const wordDisplay = document.getElementById('wordDisplay');
+            const answerInput = document.getElementById('answerInput');
+            const checkBtn = document.getElementById('checkBtn');
+            const skipBtn = document.getElementById('skipBtn');
+            const resultMessage = document.getElementById('resultMessage');
+            const statsText = document.getElementById('statsText');
+            const progressBar = document.getElementById('progressBar');
+            const apiStatus = document.getElementById('apiStatus');
+
+            // --- Состояние ---
+            let words = [];              // массив строк (английские слова)
+            let currentIndex = 0;
+            let correctCount = 0;
+            let totalWords = 0;
+            let isFinished = false;
+            let isChecking = false;      // блокировка повторных нажатий
+            let translationCache = {};   // кэш переводов { слово: перевод }
+
+            // --- Резервный список (на случай, если не загрузится основной) ---
+            const FALLBACK_WORDS = [
+                "the", "be", "to", "of", "and", "a", "in", "that", "have", "I",
+                "it", "for", "not", "on", "with", "he", "as", "you", "do", "at",
+                "this", "but", "his", "by", "from", "they", "we", "say", "her", "she",
+                "or", "an", "will", "my", "one", "all", "would", "there", "their", "what"
+            ];
+
+            // --- Загрузка списка слов ---
+            async function loadWordList() {
+                const url =
+                'https://gist.githubusercontent.com/deekayen/4148741/raw/98d48708a2477a88b9002cf7b0d78a6dd9f67671/1000-english-words.txt';
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    const text = await resp.text();
+                    // разбиваем на строки, убираем пустые, обрезаем пробелы
+                    const list = text.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
+                    if (list.length > 0) {
+                        words = list;
+                        apiStatus.textContent = '📥 Загружено ' + words.length + ' слов из внешнего списка';
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('Не удалось загрузить внешний список, используем резервный.', e);
+                }
+                // если не загрузился — берём резерв
+                words = FALLBACK_WORDS.slice();
+                apiStatus.textContent = '📖 Используется встроенный список (' + words.length + ' слов)';
+            }
+
+            // --- Получение перевода через MyMemory API ---
+            async function fetchTranslation(word) {
+                // Проверяем кэш
+                if (translationCache[word]) {
+                    return translationCache[word];
+                }
+
+                const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|ru`;
+                try {
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    const data = await resp.json();
+                    // ответ содержит responseData.translatedText
+                    if (data && data.responseData && data.responseData.translatedText) {
+                        let translation = data.responseData.translatedText.trim();
+                        // Иногда API возвращает то же слово, если перевода нет
+                        if (translation.toLowerCase() === word.toLowerCase()) {
+                            // нет перевода — помечаем специальным значением
+                            translation = null;
+                        }
+                        translationCache[word] = translation;
+                        return translation;
+                    } else {
+                        translationCache[word] = null;
+                        return null;
+                    }
+                } catch (e) {
+                    console.warn('Ошибка при запросе перевода:', e);
+                    translationCache[word] = null;
+                    return null;
+                }
+            }
+
+            // --- Инициализация игры ---
+            function initGame() {
+                // Перемешиваем слова (алгоритм Фишера–Йетса)
+                for (let i = words.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [words[i], words[j]] = [words[j], words[i]];
+                }
+                totalWords = words.length;
+                currentIndex = 0;
+                correctCount = 0;
+                isFinished = false;
+                translationCache = {}; // очищаем кэш при новом запуске
+
+                resultMessage.textContent = '';
+                resultMessage.style.color = '';
+                answerInput.disabled = false;
+                checkBtn.disabled = false;
+                skipBtn.disabled = false;
+                answerInput.focus();
+
+                showWord();
+            }
+
+            // --- Показ текущего слова ---
+            function showWord() {
+                if (currentIndex >= totalWords) {
+                    wordDisplay.textContent = '🎉 ВСЕ СЛОВА ПРОЙДЕНЫ!';
+                    answerInput.disabled = true;
+                    checkBtn.disabled = true;
+                    skipBtn.disabled = true;
+                    resultMessage.textContent = `✅ Правильных ответов: ${correctCount} из ${totalWords}`;
+                    resultMessage.style.color = '#16a34a';
+                    statsText.textContent = '';
+                    progressBar.style.width = '100%';
+                    isFinished = true;
+                    return;
+                }
+
+                const enWord = words[currentIndex];
+                wordDisplay.textContent = enWord;
+                answerInput.value = '';
+                answerInput.disabled = false;
+                checkBtn.disabled = false;
+                skipBtn.disabled = false;
+                resultMessage.textContent = '';
+                statsText.textContent = `Слово ${currentIndex+1} из ${totalWords}`;
+                progressBar.style.width = `${((currentIndex) / totalWords) * 100}%`;
+                answerInput.focus();
+            }
+
+            // --- Проверка ответа ---
+            async function checkAnswer() {
+                if (isFinished || isChecking) return;
+                if (currentIndex >= totalWords) return;
+
+                const userAnswer = answerInput.value.trim().toLowerCase();
+                if (userAnswer === '') {
+                    resultMessage.textContent = '⛔ Введите перевод!';
+                    resultMessage.style.color = '#f59e0b';
+                    return;
+                }
+
+                const enWord = words[currentIndex];
+                isChecking = true;
+                checkBtn.disabled = true;
+                skipBtn.disabled = true;
+                answerInput.disabled = true;
+
+                // Показываем индикатор загрузки
+                resultMessage.innerHTML = '<span class="loader"></span> Ищем перевод…';
+                resultMessage.style.color = '#3b82f6';
+
+                // Получаем перевод
+                const translation = await fetchTranslation(enWord);
+                if (translation === null || translation === undefined) {
+                    resultMessage.textContent = '❌ Не удалось получить перевод. Попробуйте позже.';
+                    resultMessage.style.color = '#ef4444';
+                    // Включаем обратно
+                    isChecking = false;
+                    checkBtn.disabled = false;
+                    skipBtn.disabled = false;
+                    answerInput.disabled = false;
+                    answerInput.focus();
+                    return;
+                }
+
+                // Сравниваем (игнорируем регистр и лишние пробелы)
+                const normalizedTranslation = translation.toLowerCase().trim();
+                const normalizedUser = userAnswer;
+
+                let isCorrect = false;
+                // Простое сравнение строк
+                if (normalizedUser === normalizedTranslation) {
+                    isCorrect = true;
+                } else {
+                    // Дополнительно: если перевод содержит несколько вариантов через запятую, можно проверить вхождение
+                    // но для простоты оставляем точное совпадение
+                }
+
+                if (isCorrect) {
+                    correctCount++;
+                    resultMessage.textContent = '✅ Правильно!';
+                    resultMessage.style.color = '#22c55e';
+                } else {
+                    resultMessage.textContent = `❌ Неправильно. Правильно: ${translation}`;
+                    resultMessage.style.color = '#ef4444';
+                }
+
+                // Переход к следующему слову через 1.2 сек
+                setTimeout(() => {
+                    currentIndex++;
+                    isChecking = false;
+                    showWord();
+                }, 1200);
+            }
+
+            // --- Пропуск слова ---
+            async function skipWord() {
+                if (isFinished || isChecking) return;
+                if (currentIndex >= totalWords) return;
+
+                const enWord = words[currentIndex];
+                isChecking = true;
+                checkBtn.disabled = true;
+                skipBtn.disabled = true;
+                answerInput.disabled = true;
+
+                resultMessage.innerHTML = '<span class="loader"></span> Получаем перевод…';
+                resultMessage.style.color = '#3b82f6';
+
+                const translation = await fetchTranslation(enWord);
+                if (translation === null || translation === undefined) {
+                    resultMessage.textContent = '❌ Не удалось получить перевод. Попробуйте позже.';
+                    resultMessage.style.color = '#ef4444';
+                    isChecking = false;
+                    checkBtn.disabled = false;
+                    skipBtn.disabled = false;
+                    answerInput.disabled = false;
+                    answerInput.focus();
+                    return;
+                }
+
+                resultMessage.textContent = `⏭ Пропущено. Правильно: ${translation}`;
+                resultMessage.style.color = '#f59e0b';
+
+                setTimeout(() => {
+                    currentIndex++;
+                    isChecking = false;
+                    showWord();
+                }, 1000);
+            }
+
+            // --- Обработчики событий ---
+            checkBtn.addEventListener('click', checkAnswer);
+            skipBtn.addEventListener('click', skipWord);
+            answerInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    checkAnswer();
+                }
+            });
+
+            // --- Запуск приложения ---
+            (async function start() {
+                // Загружаем список слов
+                await loadWordList();
+                // Если список пуст (не должно быть), используем резерв
+                if (words.length === 0) {
+                    words = FALLBACK_WORDS.slice();
+                    apiStatus.textContent = '⚠️ Резервный список (' + words.length + ' слов)';
+                }
+                // Инициализируем игру
+                initGame();
+            })();
+
+        })();
+    </script>
+</body>
+</html>
